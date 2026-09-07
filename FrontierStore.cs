@@ -4,7 +4,7 @@ class FrontierStore
 {
     private readonly NpgsqlDataSource _dataSource;
 
-    public FrontierStore (NpgsqlDataSource dataSource)
+    public FrontierStore(NpgsqlDataSource dataSource)
     {
         _dataSource = dataSource;
     }
@@ -90,5 +90,37 @@ class FrontierStore
         var result = await readCmd.ExecuteScalarAsync();
 
         return result as string;
+    }
+
+    public async Task MarkCompletedAsync(string url)
+    {
+        await using var completedCmd = _dataSource.CreateCommand(
+            """
+            UPDATE frontier
+            SET status = 2
+            WHERE url = $1
+                AND status = 1
+            """
+        );
+
+        completedCmd.Parameters.AddWithValue(url);
+
+        await completedCmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task MarkFailedAsync(string url)
+    {
+        await using var failedCmd = _dataSource.CreateCommand(
+            """
+            UPDATE frontier
+            SET status = -1
+            WHERE url = $1
+                AND status = 1
+        """
+        );
+
+        failedCmd.Parameters.AddWithValue(url);
+
+        await failedCmd.ExecuteNonQueryAsync();
     }
 }
