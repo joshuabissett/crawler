@@ -1,12 +1,15 @@
+using Nager.PublicSuffix;
 using Npgsql;
 
 class FrontierStore
 {
     private readonly NpgsqlDataSource _dataSource;
+    private readonly DomainParser _domainParser;
 
-    public FrontierStore(NpgsqlDataSource dataSource)
+    public FrontierStore(NpgsqlDataSource dataSource, DomainParser domainParser)
     {
         _dataSource = dataSource;
+        _domainParser = domainParser;
     }
 
     public async Task SetupDbAsync(string seed)
@@ -50,7 +53,16 @@ class FrontierStore
 
     public async Task WriteNextAsync(string url)
     {
-        string host = new Uri(url).Host;
+        if(!_domainParser.TryParse(new Uri(url).Host, out DomainInfo? domainInfo))
+        {
+            return;
+        }
+
+        string? host = domainInfo.RegistrableDomain;
+        if (host == null)
+        {
+            return;
+        }
 
         await using var writeHostCmd = _dataSource.CreateCommand(
             """

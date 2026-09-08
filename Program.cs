@@ -1,4 +1,6 @@
 ﻿using DotNetEnv;
+using Nager.PublicSuffix;
+using Nager.PublicSuffix.RuleProviders;
 using Npgsql;
 
 Env.Load();
@@ -15,10 +17,15 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 NpgsqlDataSource dataSource = NpgsqlDataSource.Create(connectionString);
+var ruleProvider = new SimpleHttpRuleProvider();
+await ruleProvider.BuildAsync();
 
-FrontierStore frontier = new(dataSource);
+var domainParser = new DomainParser(ruleProvider);
 
-string seed = "https://example.com";
+
+FrontierStore frontier = new(dataSource, domainParser);
+
+string seed = "https://nlp.stanford.edu/IR-book/html/htmledition/crawler-architecture-1.html";
 await frontier.SetupDbAsync(seed);
 
 using var httpClient = new HttpClient();
