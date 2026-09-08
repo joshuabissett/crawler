@@ -18,13 +18,41 @@ NpgsqlDataSource dataSource = NpgsqlDataSource.Create(connectionString);
 
 FrontierStore frontier = new(dataSource);
 
-string seed = "https://example.com/";
+string seed = "https://example.com";
 await frontier.SetupDbAsync(seed);
 
 using var httpClient = new HttpClient();
 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-    "JoshuaBissettCrawler/0.1 (+https://github.com/joshuabissett/crawler)"
+    "crawler/0.1 (+https://github.com/joshuabissett/crawler)"
 );
 
 CrawlerWorker worker = new(1, httpClient, frontier);
-await worker.RunAsync();
+
+using var sweepCancellation = new CancellationTokenSource();
+
+Task sweepTask = Task.Run(async () =>
+{
+    using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+
+    try
+    {
+        while (await timer.WaitForNextTickAsync(sweepCancellation.Token))
+        {
+            await frontier.SweepAsync(5);
+        }
+    }
+    catch (OperationCanceledException)
+        when (sweepCancellation.IsCancellationRequested)
+    {
+    }
+});
+
+try
+{
+    await worker.RunAsync();
+}
+finally
+{
+    sweepCancellation.Cancel();
+    await sweepTask;
+}

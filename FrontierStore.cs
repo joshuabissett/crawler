@@ -17,7 +17,8 @@ class FrontierStore
             id BIGSERIAL PRIMARY KEY,
             url TEXT NOT NULL UNIQUE,
             host TEXT NOT NULL,
-            status SMALLINT NOT NULL DEFAULT 0
+            status SMALLINT NOT NULL DEFAULT 0,
+            lease_claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
 
             CREATE TABLE IF NOT EXISTS hosts (
@@ -29,6 +30,22 @@ class FrontierStore
 
         await setupCmd.ExecuteNonQueryAsync();
         await WriteNextAsync(seed);
+
+        await SweepAsync(0);
+    }
+
+    public async Task SweepAsync(int interval)
+    {
+        await using var sweepCmd = _dataSource.CreateCommand(
+            """
+                UPDATE frontier
+                SET status = 0
+                WHERE status = 1
+                    AND lease_claimed_at + (@interval * INTERVAL '1 minutes') < NOW()
+            """
+    );
+        sweepCmd.Parameters.AddWithValue("interval", interval);
+        await sweepCmd.ExecuteNonQueryAsync();
     }
 
     public async Task WriteNextAsync(string url)
@@ -80,7 +97,8 @@ class FrontierStore
                 WHERE hosts.host = candidate.host
             )
             UPDATE frontier
-            SET status = 1
+            SET status = 1,
+                lease_claimed_at = NOW()
             FROM candidate
             WHERE frontier.id = candidate.id
             RETURNING frontier.url
