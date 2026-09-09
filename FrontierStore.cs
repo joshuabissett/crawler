@@ -53,7 +53,14 @@ class FrontierStore
 
     public async Task WriteNextAsync(string url)
     {
-        if(!_domainParser.TryParse(new Uri(url).Host, out DomainInfo? domainInfo))
+        var builder = new UriBuilder(url)
+        {
+            Fragment = string.Empty
+        };
+
+        url = builder.ToString();
+
+        if (!_domainParser.TryParse(new Uri(url).Host, out DomainInfo? domainInfo))
         {
             return;
         }
