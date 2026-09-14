@@ -22,7 +22,6 @@ await ruleProvider.BuildAsync();
 
 var domainParser = new DomainParser(ruleProvider);
 
-
 FrontierStore frontier = new(dataSource, domainParser);
 
 string seed = "https://nlp.stanford.edu/IR-book/html/htmledition/crawler-architecture-1.html";

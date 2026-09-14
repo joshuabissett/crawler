@@ -5,12 +5,15 @@ class CrawlerWorker
     private readonly int _id;
     private readonly HttpClient _httpClient;
     private readonly FrontierStore _frontier;
+    private readonly RobotParse _robotParser;
+    private readonly Dictionary<string, RobotRules?> _robotRules = new();
 
     public CrawlerWorker(int id, HttpClient httpClient, FrontierStore frontier)
     {
         _id = id;
         _httpClient = httpClient;
         _frontier = frontier;
+        _robotParser = new RobotParse(httpClient);
     }
 
     public async Task RunAsync()
@@ -31,6 +34,22 @@ class CrawlerWorker
 
     private async Task CrawlAsync(string url)
     {
+        Uri uri = new(url);
+        string host = uri.GetLeftPart(UriPartial.Authority);
+
+        if (!_robotRules.TryGetValue(host, out RobotRules? rules))
+        {
+            rules = await _robotParser.ParseRobots(uri);
+            _robotRules[host] = rules;
+        }
+
+        if (rules is not null && !rules.IsAllowed(uri))
+        {
+            Console.WriteLine($"Worker {_id}: blocked by robots.txt: {url}");
+            await _frontier.MarkCompletedAsync(url);
+            return;
+        }
+
         HttpResponseMessage response;
 
         try
