@@ -32,7 +32,7 @@ httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
     "crawler/0.1 (+https://github.com/joshuabissett/crawler)"
 );
 
-CrawlerWorker worker = new(1, httpClient, frontier);
+const int workerCount = 5;
 
 using var sweepCancellation = new CancellationTokenSource();
 
@@ -53,9 +53,13 @@ Task sweepTask = Task.Run(async () =>
     }
 });
 
+var workers = Enumerable.Range(1, workerCount)
+      .Select(id => new CrawlerWorker(id, httpClient, frontier).RunAsync())
+      .ToArray();
+
 try
 {
-    await worker.RunAsync();
+    await Task.WhenAll(workers);
 }
 finally
 {
